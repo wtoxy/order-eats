@@ -1,0 +1,80 @@
+resources:
+  - name: app-repo
+    type: git
+    source:
+      uri: https://github.com/wtoxy/order-eats.git
+      branch: master
+
+  - name: docker-image
+    type: docker-image
+    source:
+      repository: lilram/order-eats
+      username: ((docker-username))
+      password: ((docker-token))
+
+jobs:
+  - name: build-docker-image
+    plan:
+      - get: app-repo
+        trigger: true
+      - task: build-docker
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: docker, tag: 'latest'}
+          inputs:
+            - name: app-repo
+          params:
+            DOCKER_USERNAME: ((docker-username))
+            DOCKER_TOKEN: ((docker-token))
+            IMAGE_NAME: lilram/order-eats
+          run:
+            path: sh
+            args:
+              - -exc
+              - |
+                cd app-repo
+                echo $DOCKER_TOKEN | docker login -u $DOCKER_USERNAME --password-stdin
+                docker build -t $IMAGE_NAME .
+                docker push $IMAGE_NAME
+
+  - name: test-docker-image
+    plan:
+      - get: docker-image
+        trigger: true
+      - task: test-docker
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: wtoxy/order-eats, tag: latest}
+          run:
+            path: sh
+            args:
+              - -exc
+              - |
+                docker run lilram/order-eats pytest
+
+  - name: deploy
+    plan:
+      - get: docker-image
+        trigger: true
+      - task: deploy-app
+        config:
+          platform: linux
+          image_resource:
+            type: docker-image
+            source: {repository: docker, tag: 'latest'}
+          params:
+            DOCKER_HOST: tcp://localhost:2375
+            DOCKER_TLS_VERIFY: ''
+            DOCKER_CERT_PATH: ''
+          run:
+            path: sh
+            args:
+              - -exc
+              - |
+                docker -H $DOCKER_HOST pull lilram/order-eats
+                docker -H $DOCKER_HOST-compose -f ./docker-compose.yml up -d
+
