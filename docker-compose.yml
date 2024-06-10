@@ -1,0 +1,6 @@
+version: "3"
+services:
+  ordereats:
+    build: .
+    ports:
+      - 80:5000
