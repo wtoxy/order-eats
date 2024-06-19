@@ -15,8 +15,6 @@ resources:
 jobs:
   - name: build-docker-image
     plan:
-      - get: docker-image
-        trigger: true
       - get: app-repo
         trigger: true
       - task: build-docker
@@ -40,5 +38,3 @@ jobs:
                 echo $DOCKER_TOKEN | docker login -u $DOCKER_USERNAME --password-stdin
                 docker build -t $IMAGE_NAME .
                 docker push $IMAGE_NAME
-
-
